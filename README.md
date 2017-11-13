@@ -15,7 +15,7 @@ For information about this Readme file and this tool please write to
 
 ## Prerequisites and Installation
 You need Python and Apache Spark installed on you machine.
-Few python packages are needed: `numpy pandas pyasn`
+Few python packages are needed: `numpy pandas pyasn`.
 You can install them using the `pip` tool.
 
 You can install `REMeDy` issuing the git command:
