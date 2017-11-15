@@ -36,7 +36,7 @@ def main():
     anomalies = { line.split(",")[0] + " " + line.split(",")[1]  \
                   for line in open(in_anomalies,"r").read().splitlines()}
 
-    # Parse each line of the DNS log file
+    # Parse each line of the ATA DNS log file
     SLD_ASN_couples=log.mapPartitions(emit_tuples_SLD_ASN).distinct()
     domains_per_ASN=SLD_ASN_couples.countByKey()
     samples = domains_per_ASN.values()
@@ -53,15 +53,6 @@ def main():
 
     params = {"SLD_ASN" : stats_SLD_ASN, "SLD_COUNT" : stats_SLD_COUNT}
     json.dump(params,open(out_params,"w"))
-    # Reduce tuples, aggregate by (resolver, domain)
-    #log_reduced=log_mapped.reduceByKey(reduce_tuples)
-
-    # Put in final format
-    #log_final=log_reduced.map(final_map)
-
-    # Save on file
-    #log_final.saveAsTextFile(out_aggregated)
-
 
 
 def emit_tuples_SLD_ASN(lines):
@@ -72,59 +63,71 @@ def emit_tuples_SLD_ASN(lines):
     
     # Iterate over the lines
     for line in lines:
-        #try:
+        try:
+        
+            # Parse the lines
+            fields=parse_line(line)
+            # Handle the two log format
+            if len(fields) == 45:
+                NB,FT,SMAC,DMAC,DST,SRC,PROTO,BYTES,SPT,DPT,SID,DQ,DQNL,\
+                DQC,DQT,DRES,DFAA,DFTC,\
+                DFRD,DFRA,DFZ0,DFAD,DFCD,DANCOUNT,DANS,DANTTLS,\
+                _IPV,_IPTTL,_DOPCODE,_DQDCOUNT,_DNSCOUNT,_DARCOUNT,_DANTYPES,_DANLENS,_DANLEN,\
+                _DAUTHDATA,_DAUTHTYPES,_DAUTHTTLS,_DAUTHLENS,_DAUTHLEN,_DADDDATA,\
+                _DADDTYPES,_DADDTTLS,_DADDLENS,_DADDLEN \
+                =fields
+            else:
+                FT,TT,DUR,SMAC,DMAC,SRC,DST,OUT,IN,BYTES,PROTO,SPT,DPT,SID,DQ,DQNL,\
+                DQC,DQT,DRES,DFAA,DFTC,\
+                DFRD,DFRA,DFZ0,DFAD,DFCD,DANCOUNT,DANS,DANTTLS,\
+                _IPV,_IPTTL_q,_IPTTL_r,_DOPCODE,_DQDCOUNT,_DNSCOUNT,_DARCOUNT,_DANTYPES,_DANLENS,_DANLEN,\
+                _DAUTHDATA,_DAUTHTYPES,_DAUTHTTLS,_DAUTHLENS,_DAUTHLEN,_DADDDATA,\
+                _DADDTYPES,_DADDTTLS,_DADDLENS,_DADDLEN \
+                =fields
     
-        # Parse the lines
-        FT,TT,DUR,SMAC,DMAC,SRC,DST,OUT,IN,BYTES,PROTO,SPT,DPT,SID,DQ,DQNL,DQC,DQT,DRES,DFAA,DFTC,\
-        DFRD,DFRA,DFZ0,DFAD,DFCD,DANCOUNT,DANS,DANTTLS,\
-        _IPV,_IPTTL_q,_IPTTL_r,_DOPCODE,_DQDCOUNT,_DNSCOUNT,_DARCOUNT,_DANTYPES,_DANLENS,_DANLEN,\
-        _DAUTHDATA,_DAUTHTYPES,_DAUTHTTLS,_DAUTHLENS,_DAUTHLEN,_DADDDATA,_DADDTYPES,_DADDTTLS,_DADDLENS,_DADDLEN \
-        =parse_line(line)
-        #_c_FQDN,_c_SUBDOMAIN,_c_DOMAIN,_c_SLD,_c_TLD,_c_TLD_UNKNOWN,_c_FQDN_ERR,_c_DST_ASN,_c_DST_COUNTRY \
-        #=list(pd.read_csv(StringIO(line),header=None).loc[0])
-        
-        # Keep only NOERROR responses and recursive queries
-        if DRES == "NOERROR" and DFRD == "1" and DFRA == "1":
-        
-            # Get Number of CNAMEs and Server IP addresses
-            records=str(DANS).split('|-><-|')
-            sip=set()
-            clen=0
-            nip=0
-            for record in records:
-                if is_valid_ipv4(record):
-                    sip.add(record)
-                    nip+=1
-                else:
-                    clen+=1
+            # Keep only NOERROR responses and recursive queries
+            if DRES == "NOERROR" and DFRD == "1" and DFRA == "1":
             
-            # Continue only if at least one IP address has been returned
-            if nip > 0:      
-                # Get the list of ASNs from t server IPs
-                asns=[]
-                for ip in sip:
-                    try:
-                        this_asn = str(asndb.lookup(ip)[0])
-                        if this_asn == "None":
-                            this_asn = ".".join(ip.split(".")[0:2]  ) + ".0.0"
-                        if ip.startswith("127.0."):
-                            this_asn=ip
-                    except Exception as e:
-                        this_asn=ip
-                    asns.append(this_asn)
-
-                # Emit a tuple for each couple Query ASN
-                for asn in asns:
-      
-                    # Only if it is not anomalous
-                    lookup = str(DST) + " " + str(DQ).lower()  
-                    if lookup not in anomalies:
-                        SLD = getGood2LD(str(DQ).lower())
-                        tup = (asn, SLD)
-                        yield tup
-
+                # Get Number of CNAMEs and Server IP addresses
+                records=str(DANS).split('|-><-|')
+                sip=set()
+                clen=0
+                nip=0
+                for record in records:
+                    if is_valid_ipv4(record):
+                        sip.add(record)
+                        nip+=1
+                    else:
+                        clen+=1
                 
+                # Continue only if at least one IP address has been returned
+                if nip > 0:      
+                    # Get the list of ASNs from t server IPs
+                    asns=[]
+                    for ip in sip:
+                        try:
+                            this_asn = str(asndb.lookup(ip)[0])
+                            if this_asn == "None":
+                                this_asn = ".".join(ip.split(".")[0:2]  ) + ".0.0"
+                            if ip.startswith("127.0."):
+                                this_asn=ip
+                        except Exception as e:
+                            this_asn=ip
+                        asns.append(this_asn)
 
+                    # Emit a tuple for each couple Query ASN
+                    for asn in asns:
+          
+                        # Only if it is not anomalous
+                        lookup = str(DST) + " " + str(DQ).lower()  
+                        if lookup not in anomalies:
+                            SLD = getGood2LD(str(DQ).lower())
+                            tup = (asn, SLD)
+                            yield tup
+
+                    
+        except:
+            pass
 
 
 def emit_tuples_SLD_COUNT(lines):
@@ -134,58 +137,69 @@ def emit_tuples_SLD_COUNT(lines):
     
     # Iterate over the lines
     for line in lines:
-        #try:
-    
-        # Parse the lines
-        FT,TT,DUR,SMAC,DMAC,SRC,DST,OUT,IN,BYTES,PROTO,SPT,DPT,SID,DQ,DQNL,DQC,DQT,DRES,DFAA,DFTC,\
-        DFRD,DFRA,DFZ0,DFAD,DFCD,DANCOUNT,DANS,DANTTLS,\
-        _IPV,_IPTTL_q,_IPTTL_r,_DOPCODE,_DQDCOUNT,_DNSCOUNT,_DARCOUNT,_DANTYPES,_DANLENS,_DANLEN,\
-        _DAUTHDATA,_DAUTHTYPES,_DAUTHTTLS,_DAUTHLENS,_DAUTHLEN,_DADDDATA,_DADDTYPES,_DADDTTLS,_DADDLENS,_DADDLEN \
-        =parse_line(line)
-        #_c_FQDN,_c_SUBDOMAIN,_c_DOMAIN,_c_SLD,_c_TLD,_c_TLD_UNKNOWN,_c_FQDN_ERR,_c_DST_ASN,_c_DST_COUNTRY \
-        #=list(pd.read_csv(StringIO(line),header=None).loc[0])
+        try:
         
-        # Keep only NOERROR responses and recursive queries
-        if DRES == "NOERROR" and DFRD == "1" and DFRA == "1":
-        
-            # Get Number of CNAMEs and Server IP addresses
-            records=str(DANS).split('|-><-|')
-            sip=set()
-            clen=0
-            nip=0
-            for record in records:
-                if is_valid_ipv4(record):
-                    sip.add(record)
-                    nip+=1
-                else:
-                    clen+=1
+            # Parse the lines
+            fields=parse_line(line)
+            # Handle the two log format
+            if len(fields) == 45:
+                NB,FT,SMAC,DMAC,DST,SRC,PROTO,BYTES,SPT,DPT,SID,DQ,DQNL,\
+                DQC,DQT,DRES,DFAA,DFTC,\
+                DFRD,DFRA,DFZ0,DFAD,DFCD,DANCOUNT,DANS,DANTTLS,\
+                _IPV,_IPTTL,_DOPCODE,_DQDCOUNT,_DNSCOUNT,_DARCOUNT,_DANTYPES,_DANLENS,_DANLEN,\
+                _DAUTHDATA,_DAUTHTYPES,_DAUTHTTLS,_DAUTHLENS,_DAUTHLEN,_DADDDATA,\
+                _DADDTYPES,_DADDTTLS,_DADDLENS,_DADDLEN \
+                =fields
+            else:
+                FT,TT,DUR,SMAC,DMAC,SRC,DST,OUT,IN,BYTES,PROTO,SPT,DPT,SID,DQ,DQNL,\
+                DQC,DQT,DRES,DFAA,DFTC,\
+                DFRD,DFRA,DFZ0,DFAD,DFCD,DANCOUNT,DANS,DANTTLS,\
+                _IPV,_IPTTL_q,_IPTTL_r,_DOPCODE,_DQDCOUNT,_DNSCOUNT,_DARCOUNT,_DANTYPES,_DANLENS,_DANLEN,\
+                _DAUTHDATA,_DAUTHTYPES,_DAUTHTTLS,_DAUTHLENS,_DAUTHLEN,_DADDDATA,\
+                _DADDTYPES,_DADDTTLS,_DADDLENS,_DADDLEN \
+                =fields
+
+            # Keep only NOERROR responses and recursive queries
+            if DRES == "NOERROR" and DFRD == "1" and DFRA == "1":
             
-            # Continue only if at least one IP address has been returned
-            if nip > 0:      
-                # Get the list of ASNs from t server IPs
-                asns=[]
-                for ip in sip:
-                    try:
-                        this_asn = str(asndb.lookup(ip)[0])
-                    except Exception as e:
-                        this_asn=ip
-                    asns.append(this_asn)
+                # Get Number of CNAMEs and Server IP addresses
+                records=str(DANS).split('|-><-|')
+                sip=set()
+                clen=0
+                nip=0
+                for record in records:
+                    if is_valid_ipv4(record):
+                        sip.add(record)
+                        nip+=1
+                    else:
+                        clen+=1
+                
+                # Continue only if at least one IP address has been returned
+                if nip > 0:      
+                    # Get the list of ASNs from t server IPs
+                    asns=[]
+                    for ip in sip:
+                        try:
+                            this_asn = str(asndb.lookup(ip)[0])
+                        except Exception as e:
+                            this_asn=ip
+                        asns.append(this_asn)
 
-                # Emit a tuple for each couple Query ASN
-                for asn in asns:
-      
-                    # Only if it is not anomalous
-                    lookup = str(DST) + " " + str(DQ).lower()  
-                    if lookup not in anomalies:
-                        SLD = getGood2LD(str(DQ).lower())
-                        tup = (asn + " " + SLD, 1)
-                        yield tup
+                    # Emit a tuple for each couple Query ASN
+                    for asn in asns:
+          
+                        # Only if it is not anomalous
+                        lookup = str(DST) + " " + str(DQ).lower()  
+                        if lookup not in anomalies:
+                            SLD = getGood2LD(str(DQ).lower())
+                            tup = (asn + " " + SLD, 1)
+                            yield tup
 
 
 
 
-        #except:
-        #    pass
+        except:
+            pass
 
 # Reduce is just merging the two sets
 def reduce_tuples(tup1,tup2):

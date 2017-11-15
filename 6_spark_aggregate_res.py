@@ -29,7 +29,7 @@ def main():
     sc = SparkContext(conf = conf)
     log=sc.textFile(in_log)
 
-    # Parse each line of the DNS log file
+    # Parse each line of the ATA DNS log file
     log_mapped=log.mapPartitions(emit_tuples)
 
     # Reduce tuples, aggregate by (resolver)
@@ -51,16 +51,25 @@ def emit_tuples(lines):
     # Iterate over the lines
     for line in lines:
         try:
-    
             # Parse the lines
-            FT,TT,DUR,SMAC,DMAC,SRC,DST,OUT,IN,BYTES,PROTO,SPT,DPT,SID,DQ,DQNL,DQC,DQT,DRES,DFAA,DFTC,\
-            DFRD,DFRA,DFZ0,DFAD,DFCD,DANCOUNT,DANS,DANTTLS,\
-            _IPV,_IPTTL_q,_IPTTL_r,_DOPCODE,_DQDCOUNT,_DNSCOUNT,_DARCOUNT,_DANTYPES,_DANLENS,_DANLEN,\
-            _DAUTHDATA,_DAUTHTYPES,_DAUTHTTLS,_DAUTHLENS,_DAUTHLEN,_DADDDATA,_DADDTYPES,_DADDTTLS,\
-            _DADDLENS,_DADDLEN \
-            =parse_line(line)
-            #_c_FQDN,_c_SUBDOMAIN,_c_DOMAIN,_c_SLD,_c_TLD,_c_TLD_UNKNOWN,_c_FQDN_ERR,_c_DST_ASN,_c_DST_COUNTRY \
-            #=list(pd.read_csv(StringIO(line),header=None).loc[0])
+            fields=parse_line(line)
+            # Handle the two log format
+            if len(fields) == 45:
+                NB,FT,SMAC,DMAC,DST,SRC,PROTO,BYTES,SPT,DPT,SID,DQ,DQNL,\
+                DQC,DQT,DRES,DFAA,DFTC,\
+                DFRD,DFRA,DFZ0,DFAD,DFCD,DANCOUNT,DANS,DANTTLS,\
+                _IPV,_IPTTL,_DOPCODE,_DQDCOUNT,_DNSCOUNT,_DARCOUNT,_DANTYPES,_DANLENS,_DANLEN,\
+                _DAUTHDATA,_DAUTHTYPES,_DAUTHTTLS,_DAUTHLENS,_DAUTHLEN,_DADDDATA,\
+                _DADDTYPES,_DADDTTLS,_DADDLENS,_DADDLEN \
+                =fields
+            else:
+                FT,TT,DUR,SMAC,DMAC,SRC,DST,OUT,IN,BYTES,PROTO,SPT,DPT,SID,DQ,DQNL,\
+                DQC,DQT,DRES,DFAA,DFTC,\
+                DFRD,DFRA,DFZ0,DFAD,DFCD,DANCOUNT,DANS,DANTTLS,\
+                _IPV,_IPTTL_q,_IPTTL_r,_DOPCODE,_DQDCOUNT,_DNSCOUNT,_DARCOUNT,_DANTYPES,_DANLENS,_DANLEN,\
+                _DAUTHDATA,_DAUTHTYPES,_DAUTHTTLS,_DAUTHLENS,_DAUTHLEN,_DADDDATA,\
+                _DADDTYPES,_DADDTTLS,_DADDLENS,_DADDLEN \
+                =fields
 
             # Get Only Recursive Queries
             if DRES == "NOERROR" and DFRD == "1" and DFRA == "1":
@@ -69,28 +78,28 @@ def emit_tuples(lines):
                 key = DST
 
                 # Parse simple fields
-                clients     = Counter ((SRC,))
-                queries     = Counter ((DQ,))
-                resp_codes  = Counter ((DRES,))
+                clients     = set ((SRC,))
+                queries     = set ((DQ,))
+                #resp_codes  = Counter ((DRES,))
 
                 # Parse Returned Server IPs
-                servers = Counter()
+                servers = set()
                 records=str(DANS).split('|-><-|')
                 for record in records:
                     if is_valid_ipv4(record):
-                        servers[record]+=1
+                        servers.add(record)
 
                 # Get Subnets
-                subnets = Counter()
-                for ip in servers:
-                    try:
-                        subnet = ".".join(ip.split(".")[0:3])+".0"
-                        subnets[subnet]+=1
-                    except Exception as e:
-                        pass    
+                #subnets = Counter()
+                #for ip in servers:
+                #    try:
+                #        subnet = ".".join(ip.split(".")[0:3])+".0"
+                #        subnets[subnet]+=1
+                #    except Exception as e:
+                #        pass    
                          
                 # Get ASNs
-                asns = Counter()
+                asns = set()
                 for ip in servers:
                     try:
                         this_asn = str(asndb.lookup(ip)[0])
@@ -100,9 +109,9 @@ def emit_tuples(lines):
                             this_asn=ip
                     except Exception as e:
                         this_asn=ip      
-                    asns[this_asn]+=1
+                    asns.add(this_asn)
 
-                value = (1,clients,queries,resp_codes,servers,subnets,asns)
+                value = (1,clients,queries,servers,asns)
 
                 # Produce an output tuple
                 tup = (key,value)            
@@ -112,32 +121,35 @@ def emit_tuples(lines):
         except:
             pass
 
+
 # Reduce is just merging the two sets
 def reduce_tuples(tup1,tup2):
-    n1, clients1,queries1,resp_codes1,servers1,subnets1,asns1=tup1
-    n2, clients2,queries2,resp_codes2,servers2,subnets2,asns2=tup2
+    n1, clients1,queries1,servers1,asns1=tup1
+    n2, clients2,queries2,servers2,asns2=tup2
 
-    return (       n1+n2, \
-                   clients1+clients2, \
-                   queries1+queries2, \
-                   resp_codes1+resp_codes2,   \
-                   servers1+servers2,   \
-                   subnets1+subnets2,   \
-                   asns1+asns2  )
+    #start=time.time()
+    ret = (       n1+n2, \
+                   clients1|clients2, \
+                   queries1|queries2, \
+                   servers1|servers2,   \
+                   asns1|asns2  )
+    #end=time.time()
+
+    #print (start-end)
+
+    return ret
                    
 # In the end, just print the Counter in a Pandas friendly format
 def final_map(tup):
-    (res, (n,clients,queries,resp_codes,servers,subnets,asns)) = tup
+    (res, (n,clients,queries,servers,asns)) = tup
 
     n_str=str(n)
-    clients_str='"' + json.dumps(clients).replace('"','""').replace(",",";")+ '"'
-    queries_str= '"' + json.dumps(queries).replace('"','""').replace(",",";")+ '"'
-    resp_codes_str= '"' + json.dumps(resp_codes).replace('"','""').replace(",",";")+ '"'
-    servers_str= '"' + json.dumps(servers).replace('"','""').replace(",",";")+ '"'
-    subnets_str= '"' + json.dumps(subnets).replace('"','""').replace(",",";")+ '"'
-    asns_str= '"' + json.dumps(asns).replace('"','""').replace(",",";")+ '"'
+    clients_str='"' + json.dumps(list(clients)).replace('"','""').replace(",",";")+ '"'
+    queries_str= '"' + json.dumps(list(queries)).replace('"','""').replace(",",";")+ '"'
+    servers_str= '"' + json.dumps(list(servers)).replace('"','""').replace(",",";")+ '"'
+    asns_str= '"' + json.dumps(list(asns)).replace('"','""').replace(",",";")+ '"'
 
-    return ",".join([res,n_str,clients_str,queries_str,resp_codes_str,servers_str,subnets_str,asns_str])
+    return ",".join([res,n_str,clients_str,queries_str,servers_str,asns_str])
 
 # Check if an IPv4 is valid
 def is_valid_ipv4(s):

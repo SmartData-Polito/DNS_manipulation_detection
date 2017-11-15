@@ -26,7 +26,7 @@ def main ():
 
     anomalies_res_domain = { line.split(",")[0] + " " + line.split(",")[1]  \
                   for line in open(in_anomalies,"r").read().splitlines() \
-                  if "foo" not in line.split(",")[2] }
+                  if "cagnaccio" not in line.split(",")[2] }
 
     params = json.load(open(in_params,"r"))
     MIN_2LD_DOMAINS = params["SLD_ASN"][3][1]
@@ -90,6 +90,11 @@ def main ():
                    ":".join(servers),\
                    ":".join(anomaly_features)  ) )
 
+
+    #fo = open(out_per_as,"w")
+    #for anomaly in anomalies:
+    #    print (*anomaly, file=fo  )
+    #fo.close()
 
     fo = open(out_anomalies_res_asn,"w")
     print ("res domain asn servers fixed_features", file = fo)

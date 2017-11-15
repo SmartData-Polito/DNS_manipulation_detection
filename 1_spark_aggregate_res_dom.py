@@ -27,7 +27,7 @@ def main():
     sc = SparkContext(conf = conf)
     log=sc.textFile(in_log)
 
-    # Parse each line of the DNS log file
+    # Parse each line of the ATA DNS log file
     log_mapped=log.mapPartitions(emit_tuples)
 
     # Reduce tuples, aggregate by (resolver, domain)
@@ -49,59 +49,70 @@ def emit_tuples(lines):
     # Iterate over the lines
     for line in lines:
         #try:
-    
-        # Parse the lines
-        FT,TT,DUR,SMAC,DMAC,SRC,DST,OUT,IN,BYTES,PROTO,SPT,DPT,SID,DQ,DQNL,DQC,DQT,DRES,DFAA,DFTC,\
-        DFRD,DFRA,DFZ0,DFAD,DFCD,DANCOUNT,DANS,DANTTLS,\
-        _IPV,_IPTTL_q,_IPTTL_r,_DOPCODE,_DQDCOUNT,_DNSCOUNT,_DARCOUNT,_DANTYPES,_DANLENS,_DANLEN,\
-        _DAUTHDATA,_DAUTHTYPES,_DAUTHTTLS,_DAUTHLENS,_DAUTHLEN,_DADDDATA,_DADDTYPES,_DADDTTLS,_DADDLENS,_DADDLEN \
-        =parse_line(line)
-        #_c_FQDN,_c_SUBDOMAIN,_c_DOMAIN,_c_SLD,_c_TLD,_c_TLD_UNKNOWN,_c_FQDN_ERR,_c_DST_ASN,_c_DST_COUNTRY \
-        #=list(pd.read_csv(StringIO(line),header=None).loc[0])
         
-        # Keep only NOERROR responses and recursive queries
-        if DRES == "NOERROR" and DFRD == "1" and DFRA == "1":
-        
-            # Get Number of CNAMEs and Server IP addresses
-            records=str(DANS).split('|-><-|')
-            sip=set()
-            clen=0
-            nip=0
-            for record in records:
-                if is_valid_ipv4(record):
-                    sip.add(record)
-                    nip+=1
-                else:
-                    clen+=1
+            # Parse the lines
+            fields=parse_line(line)
+            # Handle the two log format
+            if len(fields) == 45:
+                NB,FT,SMAC,DMAC,DST,SRC,PROTO,BYTES,SPT,DPT,SID,DQ,DQNL,\
+                DQC,DQT,DRES,DFAA,DFTC,\
+                DFRD,DFRA,DFZ0,DFAD,DFCD,DANCOUNT,DANS,DANTTLS,\
+                _IPV,_IPTTL,_DOPCODE,_DQDCOUNT,_DNSCOUNT,_DARCOUNT,_DANTYPES,_DANLENS,_DANLEN,\
+                _DAUTHDATA,_DAUTHTYPES,_DAUTHTTLS,_DAUTHLENS,_DAUTHLEN,_DADDDATA,\
+                _DADDTYPES,_DADDTTLS,_DADDLENS,_DADDLEN \
+                =fields
+            else:
+                FT,TT,DUR,SMAC,DMAC,SRC,DST,OUT,IN,BYTES,PROTO,SPT,DPT,SID,DQ,DQNL,\
+                DQC,DQT,DRES,DFAA,DFTC,\
+                DFRD,DFRA,DFZ0,DFAD,DFCD,DANCOUNT,DANS,DANTTLS,\
+                _IPV,_IPTTL_q,_IPTTL_r,_DOPCODE,_DQDCOUNT,_DNSCOUNT,_DARCOUNT,_DANTYPES,_DANLENS,_DANLEN,\
+                _DAUTHDATA,_DAUTHTYPES,_DAUTHTTLS,_DAUTHLENS,_DAUTHLEN,_DADDDATA,\
+                _DADDTYPES,_DADDTTLS,_DADDLENS,_DADDLEN \
+                =fields
             
-            # Continue only if at least one IP address has been returned
-            if nip > 0:      
-                # Get the list of ASNs from he server IPs
-                asn=[]
-                for ip in sip:
-                    try:
-                        this_asn = str(asndb.lookup(ip)[0])
-                        if this_asn == "None":
-                            this_asn = ".".join(ip.split(".")[0:2]  ) + ".0.0"
-                        if ip.startswith("127.0."):
-                            this_asn=ip
-                    except Exception as e:
-                        this_asn=ip
-                    asn.append(this_asn)
-
-                # Get last TTL. In case multiple are present, the last refers to A records  
-                ttl=int(str(DANTTLS).split(",")[-1] )  
-                  
-    
-                # Create the aggregation key
-                key=(str(DST),str(DQ).lower())
+            # Keep only NOERROR responses and recursive queries
+            if DRES == "NOERROR" and DFRD == "1" and DFRA == "1":
+            
+                # Get Number of CNAMEs and Server IP addresses
+                records=str(DANS).split('|-><-|')
+                sip=set()
+                clen=0
+                nip=0
+                for record in records:
+                    if is_valid_ipv4(record):
+                        sip.add(record)
+                        nip+=1
+                    else:
+                        clen+=1
                 
-                # Create the value
-                value=(1, Counter((clen,)), Counter((nip,)), Counter(asn),Counter((ttl,)), Counter(sip) )
+                # Continue only if at least one IP address has been returned
+                if nip > 0:      
+                    # Get the list of ASNs from he server IPs
+                    asn=[]
+                    for ip in sip:
+                        try:
+                            this_asn = str(asndb.lookup(ip)[0])
+                            if this_asn == "None":
+                                this_asn = ".".join(ip.split(".")[0:2]  ) + ".0.0"
+                            if ip.startswith("127.0."):
+                                this_asn=ip
+                        except Exception as e:
+                            this_asn=ip
+                        asn.append(this_asn)
+
+                    # Get last TTL. In case multiple are present, the last refers to A records  
+                    ttl=int(str(DANTTLS).split(",")[-1] )  
+                      
         
-                # Emit a tuple
-                tup=(key,value)
-                yield tup
+                    # Create the aggregation key
+                    key=(str(DST),str(DQ).lower())
+                    
+                    # Create the value
+                    value=(1, Counter((clen,)), Counter((nip,)), Counter(asn),Counter((ttl,)), Counter(sip) )
+            
+                    # Emit a tuple
+                    tup=(key,value)
+                    yield tup
 
         #except:
         #    pass

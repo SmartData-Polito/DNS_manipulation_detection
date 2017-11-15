@@ -58,14 +58,24 @@ def emit_tuples(lines):
 
         try:
             # Parse the lines
-            FT,TT,DUR,SMAC,DMAC,SRC,DST,OUT,IN,BYTES,PROTO,SPT,DPT,SID,DQ,DQNL,DQC,DQT,\
-            DRES,DFAA,DFTC,DFRD,DFRA,DFZ0,DFAD,DFCD,DANCOUNT,DANS,DANTTLS,\
-            _IPV,_IPTTL_q,_IPTTL_r,_DOPCODE,_DQDCOUNT,_DNSCOUNT,_DARCOUNT,_DANTYPES,_DANLENS,_DANLEN,\
-            _DAUTHDATA,_DAUTHTYPES,_DAUTHTTLS,_DAUTHLENS,_DAUTHLEN,_DADDDATA,_DADDTYPES,\
-            _DADDTTLS,_DADDLENS,_DADDLEN =parse_line(line)
-            #_c_FQDN,_c_SUBDOMAIN,_c_DOMAIN,_c_SLD,_c_TLD,_c_TLD_UNKNOWN,_c_FQDN_ERR,_c_DST_ASN,_c_DST_COUNTRY \
-            #=list(pd.read_csv(StringIO(line),header=None).loc[0])
-
+            fields=parse_line(line)
+            # Handle the two log format
+            if len(fields) == 45:
+                NB,FT,SMAC,DMAC,DST,SRC,PROTO,BYTES,SPT,DPT,SID,DQ,DQNL,\
+                DQC,DQT,DRES,DFAA,DFTC,\
+                DFRD,DFRA,DFZ0,DFAD,DFCD,DANCOUNT,DANS,DANTTLS,\
+                _IPV,_IPTTL,_DOPCODE,_DQDCOUNT,_DNSCOUNT,_DARCOUNT,_DANTYPES,_DANLENS,_DANLEN,\
+                _DAUTHDATA,_DAUTHTYPES,_DAUTHTTLS,_DAUTHLENS,_DAUTHLEN,_DADDDATA,\
+                _DADDTYPES,_DADDTTLS,_DADDLENS,_DADDLEN \
+                =fields
+            else:
+                FT,TT,DUR,SMAC,DMAC,SRC,DST,OUT,IN,BYTES,PROTO,SPT,DPT,SID,DQ,DQNL,\
+                DQC,DQT,DRES,DFAA,DFTC,\
+                DFRD,DFRA,DFZ0,DFAD,DFCD,DANCOUNT,DANS,DANTTLS,\
+                _IPV,_IPTTL_q,_IPTTL_r,_DOPCODE,_DQDCOUNT,_DNSCOUNT,_DARCOUNT,_DANTYPES,_DANLENS,_DANLEN,\
+                _DAUTHDATA,_DAUTHTYPES,_DAUTHTTLS,_DAUTHLENS,_DAUTHLEN,_DADDDATA,\
+                _DADDTYPES,_DADDTTLS,_DADDLENS,_DADDLEN \
+                =fields
             # Get Only Recursive Queries
             if DRES == "NOERROR" and DFRD == "1" and DFRA == "1":
 

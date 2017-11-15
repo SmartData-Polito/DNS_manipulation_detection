@@ -31,15 +31,13 @@ def main ():
         
         clients=json_to_counter(fields[2])
         queries=json_to_counter(fields[3])
-        codes=  json_to_counter(fields[4])
-        servers=json_to_counter(fields[5])
-        subnets=json_to_counter(fields[6])
-        asns=json_to_counter(fields[7])
+        servers=json_to_counter(fields[4])
+        asns=json_to_counter(fields[5])
 
 
         # Update per domain data
-        domain_query_info={"count":count, "clients":clients, "queries":queries, "codes":codes, "servers":servers,\
-                           "subnets":subnets, "asns":asns}
+        domain_query_info={"count":count, "clients":clients, "queries":queries, "servers":servers,\
+                           "asns":asns}
         data[resolver]=domain_query_info
 
     data_resolver = []
