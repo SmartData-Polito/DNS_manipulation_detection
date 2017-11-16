@@ -11,18 +11,14 @@ import functools
 import sys
 from math import ceil, floor
 
-# INPUT
+# INPUT and OUTPUT files
 in_aggregated=sys.argv[1]
 out_anomalies=sys.argv[2]
 min_resolutions=int(sys.argv[3])
 
-
 ttl_granularity=5
 
-
-
 def main ():
-
 
     # Open Aggregated Log and parse it
     data_per_domain = defaultdict(dict)
@@ -70,8 +66,6 @@ def main ():
             ttl_all_max [max_ttl_rounded] += 1
             all_ttls.append(max_ttl_rounded)
         value, count = ttl_all_max.most_common()[0]
-        #normality[domain]["ttl"]={"normality":value, "freq": count / sum(ttl_all_max.values() ) }
-        #normality[domain]["ttl_all"]=ttl_all_max
         normality[domain]["ttl"]={"normality":numpy.percentile(all_ttls,75) + 
                                                     1.5*(   numpy.percentile(all_ttls,75) 
                                                           - numpy.percentile(all_ttls,15)   )}
@@ -82,15 +76,13 @@ def main ():
             m = statistical_anomalies(list(samples))
             normality[domain][feature]=m
 
-    
-    json.dump(normality, open("/tmp/normality.json","w"))
-  
+      
     # Find "anomalies"
-
     anomalies = defaultdict(lambda : [])
     for domain in considered_domains:
         for resolver in data_per_domain[domain]:
 
+            # TTL Use boxplot rule
             ttl_normal=0
             ttl_no_normal=0 
             max_ttl=0
@@ -123,7 +115,7 @@ def main ():
                 if times_no_normal > 0 and times_normal==0:
                     anomalies [ resolver + "," + domain].append(feature)
 
-
+    # Save on file
     fo=open(out_anomalies,"w")
     print ( "resolver,query,type", file=fo, sep=",")
     for key in anomalies:
@@ -134,10 +126,6 @@ def json_to_counter(s):
     s_clean=s.replace('""','"').replace(";",",")[1:-1]
     return Counter( json.loads(s_clean))
 
-
-# MAD
-def mad(data, axis=None):
-    return mean(absolute(data - mean(data, axis)), axis)
 
 # 3Q+1.5*IQR
 def statistical_anomalies(s):
@@ -174,14 +162,5 @@ def statistical_anomalies(s):
   else:
     return s_sorted[rounding(th)]
 
-def leave_tail_out(s):
-  param = 1-0.993
-  s_sum = sum(s)
-  s_sorted_norm = [ e/s_sum for e in sorted (s, reverse=False) ]
-  cum=0
-  for n in s_sorted_norm:
-    cum+=n
-    if cum > param:
-        return n * s_sum 
 
 main()

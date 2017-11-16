@@ -38,19 +38,21 @@ def main():
 
     # Parse each line of the ATA DNS log file
     SLD_ASN_couples=log.mapPartitions(emit_tuples_SLD_ASN).distinct()
+
+    # Compute stat: SLD_ASN
     domains_per_ASN=SLD_ASN_couples.countByKey()
     samples = domains_per_ASN.values()
     percentiles = np.percentile (samples, [0,5,25,50,75,95,100])
     
     stats_SLD_ASN = zip([0,5,25,50,75,95,100],percentiles )
     
-
+    # Compute stat: SLD_COUNT
     SLD_COUNT_couples=log.mapPartitions(emit_tuples_SLD_COUNT).countByKey()
     samples = SLD_COUNT_couples.values()
     percentiles = np.percentile (samples, [0,5,25,50,75,95,100])
     stats_SLD_COUNT = zip([0,5,25,50,75,95,100],percentiles )
 
-
+    # Save on files
     params = {"SLD_ASN" : stats_SLD_ASN, "SLD_COUNT" : stats_SLD_COUNT}
     json.dump(params,open(out_params,"w"))
 
@@ -67,7 +69,7 @@ def emit_tuples_SLD_ASN(lines):
         
             # Parse the lines
             fields=parse_line(line)
-            # Handle the two log format
+            # Handle the two log formats (short and long)
             if len(fields) == 45:
                 NB,FT,SMAC,DMAC,DST,SRC,PROTO,BYTES,SPT,DPT,SID,DQ,DQNL,\
                 DQC,DQT,DRES,DFAA,DFTC,\

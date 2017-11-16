@@ -37,7 +37,7 @@ def main():
     # Parse each line of the ATA DNS log file
     log_mapped=log.mapPartitions(emit_tuples)
 
-    # Reduce tuples, aggregate by (resolver)
+    # Reduce tuples, aggregate by (resolver, ASN)
     log_reduced=log_mapped.reduceByKey(reduce_tuples)
 
     # Put in final format
@@ -59,7 +59,7 @@ def emit_tuples(lines):
         try:
             # Parse the lines
             fields=parse_line(line)
-            # Handle the two log format
+            # Handle the two log formats (short and long)
             if len(fields) == 45:
                 NB,FT,SMAC,DMAC,DST,SRC,PROTO,BYTES,SPT,DPT,SID,DQ,DQNL,\
                 DQC,DQT,DRES,DFAA,DFTC,\

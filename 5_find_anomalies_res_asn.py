@@ -15,6 +15,7 @@ from math import ceil, floor
 in_aggregated=sys.argv[1]
 in_params = sys.argv[2]
 in_anomalies = sys.argv[3]
+# OUTPUT
 out_anomalies_res_asn = sys.argv[4]
 
 
@@ -23,7 +24,7 @@ MIN_2LD_DOMAINS=3
 
 def main ():
 
-
+    # Parse input
     anomalies_res_domain = { line.split(",")[0] + " " + line.split(",")[1]  \
                   for line in open(in_anomalies,"r").read().splitlines() \
                   if "cagnaccio" not in line.split(",")[2] }
@@ -63,6 +64,7 @@ def main ():
     anomalies = []
 
     for key in data:
+        # Get stats
         resolver, asn = key.split()
         count = data[key]["count"]
         queries_2ld=data[key]["queries_2ld"]
@@ -74,11 +76,13 @@ def main ():
         nip = data[key]["nip"]
         servers = data[key]["servers"]
 
+        # Count fixed features
         anomaly_features = []
         for feature, counter in {"ttl":ttls, "cname":cnames, "nip":nip}.items():
             if len(counter) == 1:
                 anomaly_features.append(feature)
 
+        # Print resulting anomalies
         if count/n_queries_2ld > MIN_RATIO and n_queries_2ld > MIN_2LD_DOMAINS and \
            len (anomaly_features) > 1:
             anomalies.append (  (resolver, asn , count, n_queries_2ld , \
@@ -91,10 +95,6 @@ def main ():
                    ":".join(anomaly_features)  ) )
 
 
-    #fo = open(out_per_as,"w")
-    #for anomaly in anomalies:
-    #    print (*anomaly, file=fo  )
-    #fo.close()
 
     fo = open(out_anomalies_res_asn,"w")
     print ("res domain asn servers fixed_features", file = fo)

@@ -53,7 +53,7 @@ def emit_tuples(lines):
         try:
             # Parse the lines
             fields=parse_line(line)
-            # Handle the two log format
+            # Handle the two log formats (short and long)
             if len(fields) == 45:
                 NB,FT,SMAC,DMAC,DST,SRC,PROTO,BYTES,SPT,DPT,SID,DQ,DQNL,\
                 DQC,DQT,DRES,DFAA,DFTC,\
@@ -80,7 +80,6 @@ def emit_tuples(lines):
                 # Parse simple fields
                 clients     = set ((SRC,))
                 queries     = set ((DQ,))
-                #resp_codes  = Counter ((DRES,))
 
                 # Parse Returned Server IPs
                 servers = set()
@@ -89,14 +88,6 @@ def emit_tuples(lines):
                     if is_valid_ipv4(record):
                         servers.add(record)
 
-                # Get Subnets
-                #subnets = Counter()
-                #for ip in servers:
-                #    try:
-                #        subnet = ".".join(ip.split(".")[0:3])+".0"
-                #        subnets[subnet]+=1
-                #    except Exception as e:
-                #        pass    
                          
                 # Get ASNs
                 asns = set()
@@ -127,15 +118,12 @@ def reduce_tuples(tup1,tup2):
     n1, clients1,queries1,servers1,asns1=tup1
     n2, clients2,queries2,servers2,asns2=tup2
 
-    #start=time.time()
     ret = (       n1+n2, \
                    clients1|clients2, \
                    queries1|queries2, \
                    servers1|servers2,   \
                    asns1|asns2  )
-    #end=time.time()
 
-    #print (start-end)
 
     return ret
                    

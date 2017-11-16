@@ -48,11 +48,11 @@ def emit_tuples(lines):
     
     # Iterate over the lines
     for line in lines:
-        #try:
+        try:
         
             # Parse the lines
             fields=parse_line(line)
-            # Handle the two log format
+            # Handle the two log formats (short and long)
             if len(fields) == 45:
                 NB,FT,SMAC,DMAC,DST,SRC,PROTO,BYTES,SPT,DPT,SID,DQ,DQNL,\
                 DQC,DQT,DRES,DFAA,DFTC,\
@@ -114,8 +114,8 @@ def emit_tuples(lines):
                     tup=(key,value)
                     yield tup
 
-        #except:
-        #    pass
+        except:
+            pass
 
 # Reduce is just merging the two sets
 def reduce_tuples(tup1,tup2):
